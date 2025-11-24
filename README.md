@@ -1,10 +1,23 @@
 # Bottle Detection System
 
+![System Overview](docs/system_overview.gif)
+*Demonstration of the bottle detection and interaction system in action.*
+
 ## Structure
 - `app/`: Main application code (inference and config server).
 - `models/`: YOLO models.
 - `scripts/`: Utility scripts (config tool, repair).
 - `roi_images/`: Generated reference images for ROIs.
+
+## Visuals
+
+### Configuration Tool
+![Config Tool](docs/config_tool_demo.gif)
+*Web-based interface for defining Polygon ROIs.*
+
+### Inference & Interaction
+![Inference Demo](docs/inference_demo.gif)
+*Real-time detection, tracking, and hand-bottle interaction with similarity analysis.*
 
 ## Setup
 1. Install dependencies:
