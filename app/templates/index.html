@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bottle Config Tool</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            background-color: #1e1e1e;
+            color: #eee;
+        }
+
+        #sidebar {
+            width: 300px;
+            background-color: #252526;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #333;
+        }
+
+        #main {
+            flex-grow: 1;
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background-color: #1e1e1e;
+        }
+
+        canvas {
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            cursor: crosshair;
+        }
+
+        h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            color: #fff;
+        }
+
+        .control-group {
+            margin-bottom: 15px;
+        }
+
+        button {
+            background-color: #0e639c;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            cursor: pointer;
+            border-radius: 2px;
+            margin-right: 5px;
+            font-size: 0.9rem;
+        }
+
+        button:hover {
+            background-color: #1177bb;
+        }
+
+        button.danger {
+            background-color: #a1260d;
+        }
+
+        button.danger:hover {
+            background-color: #c53011;
+        }
+
+        .roi-list {
+            flex-grow: 1;
+            overflow-y: auto;
+            margin-top: 10px;
+            border-top: 1px solid #333;
+        }
+
+        .roi-item {
+            background-color: #333;
+            padding: 10px;
+            margin-bottom: 5px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            cursor: pointer;
+            border-left: 4px solid transparent;
+        }
+
+        .roi-item.selected {
+            background-color: #3c3c3c;
+            border-left-color: #0e639c;
+        }
+
+        .roi-item input {
+            background: #1e1e1e;
+            border: 1px solid #444;
+            color: #eee;
+            padding: 4px;
+            width: 80px;
+        }
+
+        .roi-item .color-box {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        #status {
+            margin-top: 10px;
+            font-size: 0.8rem;
+            color: #aaa;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="sidebar">
+        <h2>Configuration</h2>
+
+        <div class="control-group">
+            <button onclick="saveConfig()">Save</button>
+            <button onclick="undo()" id="btnUndo">Undo</button>
+            <button onclick="redo()" id="btnRedo">Redo</button>
+        </div>
+
+        <div class="control-group">
+            <button class="danger" onclick="clearAll()">Clear All</button>
+        </div>
+
+        <div class="control-group">
+            <label>Current Frame: <span id="frameIdx">0</span></label>
+            <button onclick="nextFrame()">Next Frame</button>
+        </div>
+
+        <div class="roi-list" id="roiList">
+            <!-- ROI items will be added here -->
+        </div>
+
+        <div id="status">Ready</div>
+    </div>
+
+    <div id="main">
+        <canvas id="canvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const roiListEl = document.getElementById('roiList');
+        const statusEl = document.getElementById('status');
+
+        let config = { rois: [] };
+        let currentFrameIndex = 0;
+        let image = new Image();
+        let isDrawing = false;
+        let currentPoints = [];
+        let selectedRoiIndex = -1;
+        let draggingPointIndex = -1;
+
+        // History for Undo/Redo
+        let history = [];
+        let historyIndex = -1;
+
+        function addToHistory() {
+            // Remove any future history if we are in the middle
+            if (historyIndex < history.length - 1) {
+                history = history.slice(0, historyIndex + 1);
+            }
+            history.push(JSON.parse(JSON.stringify(config)));
+            historyIndex++;
+            updateButtons();
+        }
+
+        function undo() {
+            if (historyIndex > 0) {
+                historyIndex--;
+                config = JSON.parse(JSON.stringify(history[historyIndex]));
+                render();
+                updateRoiList();
+                updateButtons();
+                statusEl.innerText = "Undid last action";
+            }
+        }
+
+        function redo() {
+            if (historyIndex < history.length - 1) {
+                historyIndex++;
+                config = JSON.parse(JSON.stringify(history[historyIndex]));
+                render();
+                updateRoiList();
+                updateButtons();
+                statusEl.innerText = "Redid last action";
+            }
+        }
+
+        function updateButtons() {
+            document.getElementById('btnUndo').disabled = historyIndex <= 0;
+            document.getElementById('btnRedo').disabled = historyIndex >= history.length - 1;
+        }
+
+        function loadFrame() {
+            image.src = `/frame?index=${currentFrameIndex}&t=${Date.now()}`;
+            document.getElementById('frameIdx').innerText = currentFrameIndex;
+        }
+
+        image.onload = function () {
+            canvas.width = image.width;
+            canvas.height = image.height;
+            render();
+        };
+
+        function nextFrame() {
+            currentFrameIndex += 30; // Skip 30 frames
+            loadFrame();
+        }
+
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(image, 0, 0);
+
+            // Draw ROIs
+            config.rois.forEach((roi, index) => {
+                drawPolygon(roi.points, roi.color || '#00ff00', index === selectedRoiIndex);
+            });
+
+            // Draw current drawing
+            if (currentPoints.length > 0) {
+                drawPolygon(currentPoints, '#ffff00', true, false);
+                // Draw line to mouse if drawing
+            }
+        }
+
+        function drawPolygon(points, color, isSelected, isClosed = true) {
+            ctx.beginPath();
+            ctx.moveTo(points[0][0], points[0][1]);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i][0], points[i][1]);
+            }
+            if (isClosed) ctx.closePath();
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = isSelected ? 3 : 2;
+            ctx.stroke();
+
+            ctx.fillStyle = color;
+            ctx.globalAlpha = 0.2;
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+
+            // Draw handles if selected
+            if (isSelected) {
+                ctx.fillStyle = '#fff';
+                points.forEach(p => {
+                    ctx.fillRect(p[0] - 4, p[1] - 4, 8, 8);
+                });
+            }
+        }
+
+        // Interaction
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            if (selectedRoiIndex !== -1) {
+                // Check if clicking a handle
+                const roi = config.rois[selectedRoiIndex];
+                for (let i = 0; i < roi.points.length; i++) {
+                    const p = roi.points[i];
+                    if (Math.abs(p[0] - x) < 10 && Math.abs(p[1] - y) < 10) {
+                        draggingPointIndex = i;
+                        return;
+                    }
+                }
+            }
+
+            if (isDrawing) {
+                currentPoints.push([x, y]);
+                if (currentPoints.length === 4) {
+                    // Finish drawing
+                    const newRoi = {
+                        label: "New Bottle",
+                        points: currentPoints,
+                        color: getRandomColor()
+                    };
+                    config.rois.push(newRoi);
+                    selectedRoiIndex = config.rois.length - 1;
+                    currentPoints = [];
+                    isDrawing = false;
+                    addToHistory();
+                    updateRoiList();
+
+                    // Auto calculate histogram
+                    calculateHistogram(newRoi);
+                }
+            } else {
+                // Check if clicking inside an ROI to select it
+                let found = false;
+                for (let i = config.rois.length - 1; i >= 0; i--) {
+                    if (isPointInPoly([x, y], config.rois[i].points)) {
+                        selectedRoiIndex = i;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    // Start new drawing
+                    selectedRoiIndex = -1;
+                    isDrawing = true;
+                    currentPoints.push([x, y]);
+                }
+                updateRoiList();
+            }
+            render();
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            if (draggingPointIndex !== -1 && selectedRoiIndex !== -1) {
+                config.rois[selectedRoiIndex].points[draggingPointIndex] = [x, y];
+                render();
+            } else if (isDrawing) {
+                render();
+                // Draw elastic line
+                if (currentPoints.length > 0) {
+                    const last = currentPoints[currentPoints.length - 1];
+                    ctx.beginPath();
+                    ctx.moveTo(last[0], last[1]);
+                    ctx.lineTo(x, y);
+                    ctx.strokeStyle = '#ffff00';
+                    ctx.stroke();
+                }
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            if (draggingPointIndex !== -1) {
+                draggingPointIndex = -1;
+                addToHistory();
+                // Recalculate histogram on drag end
+                if (selectedRoiIndex !== -1) {
+                    calculateHistogram(config.rois[selectedRoiIndex]);
+                }
+            }
+        });
+
+        function isPointInPoly(p, polygon) {
+            let isInside = false;
+            let minX = polygon[0][0], maxX = polygon[0][0];
+            let minY = polygon[0][1], maxY = polygon[0][1];
+            for (let n = 1; n < polygon.length; n++) {
+                let q = polygon[n];
+                minX = Math.min(q[0], minX);
+                maxX = Math.max(q[0], maxX);
+                minY = Math.min(q[1], minY);
+                maxY = Math.max(q[1], maxY);
+            }
+
+            if (p[0] < minX || p[0] > maxX || p[1] < minY || p[1] > maxY) {
+                return false;
+            }
+
+            let i = 0, j = polygon.length - 1;
+            for (i, j; i < polygon.length; j = i++) {
+                if ((polygon[i][1] > p[1]) != (polygon[j][1] > p[1]) &&
+                    p[0] < (polygon[j][0] - polygon[i][0]) * (p[1] - polygon[i][1]) / (polygon[j][1] - polygon[i][1]) + polygon[i][0]) {
+                    isInside = !isInside;
+                }
+            }
+            return isInside;
+        }
+
+        function updateRoiList() {
+            roiListEl.innerHTML = '';
+            config.rois.forEach((roi, index) => {
+                const div = document.createElement('div');
+                div.className = 'roi-item' + (index === selectedRoiIndex ? ' selected' : '');
+                div.onclick = () => {
+                    selectedRoiIndex = index;
+                    render();
+                    updateRoiList();
+                };
+
+                div.innerHTML = `
+                <div style="display:flex; align-items:center;">
+                    <div class="color-box" style="background-color:${roi.color}"></div>
+                    <input type="text" value="${roi.label}" onchange="updateLabel(${index}, this.value)" onclick="event.stopPropagation()">
+                </div>
+                <button class="danger" style="padding:2px 6px; font-size:0.7rem;" onclick="deleteRoi(${index}); event.stopPropagation()">X</button>
+            `;
+                roiListEl.appendChild(div);
+            });
+        }
+
+        function updateLabel(index, newLabel) {
+            config.rois[index].label = newLabel;
+            addToHistory();
+        }
+
+        function deleteRoi(index) {
+            if (confirm("Delete this ROI?")) {
+                config.rois.splice(index, 1);
+                selectedRoiIndex = -1;
+                addToHistory();
+                render();
+                updateRoiList();
+            }
+        }
+
+        function clearAll() {
+            if (confirm("Are you sure you want to clear all ROIs?")) {
+                config.rois = [];
+                selectedRoiIndex = -1;
+                addToHistory();
+                render();
+                updateRoiList();
+            }
+        }
+
+        function getRandomColor() {
+            const letters = '0123456789ABCDEF';
+            let color = '#';
+            for (let i = 0; i < 6; i++) {
+                color += letters[Math.floor(Math.random() * 16)];
+            }
+            return color;
+        }
+
+        function saveConfig() {
+            fetch('/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(config)
+            })
+                .then(res => res.json())
+                .then(data => {
+                    statusEl.innerText = "Saved successfully at " + new Date().toLocaleTimeString();
+                });
+        }
+
+        function calculateHistogram(roi) {
+            fetch('/histogram', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    points: roi.points,
+                    frame_index: currentFrameIndex
+                })
+            })
+                .then(res => res.json())
+                .then(data => {
+                    roi.histogram = data.histogram;
+                    roi.image_path = data.image_path;
+                    console.log("Histogram and Image updated for", roi.label);
+                    // We don't add to history here to avoid spamming undo stack with background updates
+                    // But we should probably save this change to the current state
+                });
+        }
+
+        // Init
+        fetch('/config')
+            .then(res => res.json())
+            .then(data => {
+                config = data;
+                if (!config.rois) config.rois = [];
+                addToHistory(); // Initial state
+                updateRoiList();
+                loadFrame();
+            });
+
+        // Auto-save every 30 seconds
+        setInterval(saveConfig, 30000);
+
+    </script>
+</body>
+
+</html>

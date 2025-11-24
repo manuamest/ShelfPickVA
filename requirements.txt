@@ -1,0 +1,7 @@
+ultralytics
+mediapipe
+opencv-python
+numpy
+scipy
+flask
+ultralytics
