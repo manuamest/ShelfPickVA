@@ -101,8 +101,10 @@ def calculate_histogram():
     # roi_crop = cv2.bitwise_and(roi_crop, roi_crop, mask=crop_mask)
     
     import time
-    timestamp = int(time.time() * 1000)
-    image_filename = f"roi_{timestamp}.jpg"
+    import re
+    # Sanitize label for filename
+    safe_label = re.sub(r'[^a-zA-Z0-9]', '_', data.get('label', 'unknown'))
+    image_filename = f"roi_bottle_{safe_label}.jpg"
     image_path = os.path.join("roi_images", image_filename)
     cv2.imwrite(image_path, roi_crop)
     
@@ -160,8 +162,9 @@ def main():
                             
                             if w > 0 and h > 0:
                                 roi_crop = frame[y:y+h, x:x+w].copy()
-                                timestamp = int(time.time() * 1000) + i
-                                image_filename = f"roi_retro_{timestamp}.jpg"
+                                import re
+                                safe_label = re.sub(r'[^a-zA-Z0-9]', '_', roi['label'])
+                                image_filename = f"roi_bottle_{safe_label}.jpg"
                                 image_path = os.path.join("roi_images", image_filename)
                                 cv2.imwrite(image_path, roi_crop)
                                 roi["image_path"] = image_path

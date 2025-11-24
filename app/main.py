@@ -78,6 +78,7 @@ class InteractionLogic:
     def __init__(self, config):
         self.config = config
         self.rois = config.get("rois", [])
+        self.roi_dwell_times = {roi['label']: 0 for roi in self.rois if 'label' in roi}
         # Parse histograms from config
         for roi in self.rois:
             if "histogram" in roi:
@@ -87,10 +88,25 @@ class InteractionLogic:
             else:
                 roi["hist_np"] = None
             
-            # Load reference image if available
+            # Load reference image implicitly based on label
             roi["ref_img"] = None
-            if "image_path" in roi and os.path.exists(roi["image_path"]):
-                roi["ref_img"] = cv2.imread(roi["image_path"])
+            import re
+            safe_label = re.sub(r'[^a-zA-Z0-9]', '_', roi['label'])
+            image_filename = f"roi_bottle_{safe_label}.jpg"
+            
+            # 1. Try in roi_images/ relative to CWD
+            local_path = os.path.join("roi_images", image_filename)
+            if os.path.exists(local_path):
+                roi["ref_img"] = cv2.imread(local_path)
+                # print(f"Loaded ROI image: {local_path}")
+            else:
+                # 2. Try in ../roi_images/ relative to CWD
+                parent_path = os.path.join("..", "roi_images", image_filename)
+                if os.path.exists(parent_path):
+                    roi["ref_img"] = cv2.imread(parent_path)
+                    # print(f"Loaded ROI image: {parent_path}")
+                else:
+                    print(f"Warning: ROI image not found for label '{roi['label']}': {local_path}")
 
     def check_hand_in_roi(self, hand_box):
         # Check if hand center is inside any defined ROI
@@ -111,7 +127,17 @@ class InteractionLogic:
                 rx, ry, rw, rh = roi['rect']
                 if rx <= h_cx <= rx + rw and ry <= h_cy <= ry + rh:
                     return roi['label']
+                if rx <= h_cx <= rx + rw and ry <= h_cy <= ry + rh:
+                    return roi['label']
         return None
+
+    def update_dwell_times(self, active_label):
+        # Increment active label, decay others
+        for label in self.roi_dwell_times:
+            if label == active_label:
+                self.roi_dwell_times[label] = min(100, self.roi_dwell_times[label] + 2) # Cap at 100
+            else:
+                self.roi_dwell_times[label] = max(0, self.roi_dwell_times[label] - 1) # Decay
 
     def find_closest_bottle(self, hand_box, bottle_detections):
         # Find bottle detection closest to hand center
@@ -148,10 +174,16 @@ class InteractionLogic:
         scores = []
         for roi in self.rois:
             if roi.get("hist_np") is not None:
-                score = cv2.compareHist(hist, roi["hist_np"], cv2.HISTCMP_CORREL)
+                base_score = cv2.compareHist(hist, roi["hist_np"], cv2.HISTCMP_CORREL)
+                
+                # Add dwell time bonus
+                # Max bonus of 0.5 if dwell time is 100
+                dwell_bonus = (self.roi_dwell_times.get(roi["label"], 0) / 100.0) * 0.5
+                final_score = base_score + dwell_bonus
+                
                 scores.append({
                     "label": roi["label"],
-                    "score": score,
+                    "score": final_score,
                     "ref_img": roi.get("ref_img")
                 })
         
@@ -168,49 +200,62 @@ def hex_to_bgr(hex_color):
     b = int(hex_color[4:6], 16)
     return (b, g, r) # OpenCV uses BGR
 
-def draw_bottom_panel(frame, scores, panel_height=400):
+def draw_bottom_panel(frame, scores, panel_height=300):
     h, w, c = frame.shape
     panel = np.zeros((panel_height, w, c), dtype=np.uint8)
     panel[:] = (30, 30, 30) # Dark gray background
     
-    # Title
-    cv2.putText(panel, "Top 5 Probabilities", (20, 50), cv2.FONT_HERSHEY_SIMPLEX, 1.2, (255, 255, 255), 2)
+    # Calculate cell dimensions
+    num_cells = 5
+    cell_width = w // num_cells
+    cell_height = panel_height
     
-    start_x = 40
-    item_width = 220
-    img_size = 200
-    
-    for i, item in enumerate(scores):
-        x = start_x + i * (item_width + 40)
-        if x + item_width > w: break
+    # Draw cells
+    for i in range(num_cells):
+        x_start = i * cell_width
+        x_end = (i + 1) * cell_width
         
-        # Draw Reference Image
-        if item["ref_img"] is not None:
-            ref_h, ref_w = item["ref_img"].shape[:2]
-            # Resize to fit in img_size x img_size box
-            scale = min(img_size/ref_h, img_size/ref_w)
-            new_w, new_h = int(ref_w * scale), int(ref_h * scale)
-            resized_ref = cv2.resize(item["ref_img"], (new_w, new_h))
+        # Draw separator
+        if i > 0:
+            cv2.line(panel, (x_start, 0), (x_start, panel_height), (100, 100, 100), 1)
             
-            y_offset = 80 + (img_size - new_h) // 2
-            x_offset = x + (item_width - new_w) // 2
-            panel[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized_ref
-        else:
-            # Placeholder
-            cv2.rectangle(panel, (x + (item_width-img_size)//2, 80), (x + (item_width+img_size)//2, 80+img_size), (50, 50, 50), -1)
-            cv2.putText(panel, "No Img", (x + item_width//2 - 40, 80 + img_size//2), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (150, 150, 150), 2)
+        if i < len(scores):
+            item = scores[i]
+            
+            # Draw Reference Image (Centered)
+            img_size = min(cell_width, cell_height) - 60
+            if item["ref_img"] is not None:
+                ref_h, ref_w = item["ref_img"].shape[:2]
+                scale = min(img_size/ref_h, img_size/ref_w)
+                new_w, new_h = int(ref_w * scale), int(ref_h * scale)
+                resized_ref = cv2.resize(item["ref_img"], (new_w, new_h))
+                
+                y_offset = (cell_height - new_h) // 2 - 20
+                x_offset = x_start + (cell_width - new_w) // 2
+                panel[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized_ref
+            else:
+                # Placeholder
+                cv2.rectangle(panel, (x_start + (cell_width-img_size)//2, (cell_height-img_size)//2 - 20), 
+                              (x_start + (cell_width+img_size)//2, (cell_height+img_size)//2 - 20 + img_size), (50, 50, 50), -1)
+                cv2.putText(panel, "No Img", (x_start + cell_width//2 - 40, cell_height//2), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (150, 150, 150), 2)
 
-        # Label
-        label = item["label"]
-        if len(label) > 18: label = label[:15] + "..."
-        cv2.putText(panel, label, (x, 80 + img_size + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-        
-        # Score Bar
-        score = max(0, item["score"])
-        bar_width = int(item_width * score)
-        cv2.rectangle(panel, (x, 80 + img_size + 45), (x + item_width, 80 + img_size + 65), (50, 50, 50), -1)
-        cv2.rectangle(panel, (x, 80 + img_size + 45), (x + bar_width, 80 + img_size + 65), (0, 255, 0), -1)
-        cv2.putText(panel, f"{score:.2f}", (x + item_width - 50, 80 + img_size + 90), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (200, 200, 200), 1)
+            # Label
+            label = item["label"]
+            if len(label) > 15: label = label[:12] + "..."
+            text_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)[0]
+            text_x = x_start + (cell_width - text_size[0]) // 2
+            cv2.putText(panel, label, (text_x, cell_height - 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+            
+            # Score Bar
+            score = max(0, min(1.0, item["score"])) # Clamp 0-1
+            bar_w = int((cell_width - 40) * score)
+            bar_start_x = x_start + 20
+            cv2.rectangle(panel, (bar_start_x, cell_height - 40), (bar_start_x + cell_width - 40, cell_height - 25), (50, 50, 50), -1)
+            cv2.rectangle(panel, (bar_start_x, cell_height - 40), (bar_start_x + bar_w, cell_height - 25), (0, 255, 0), -1)
+            
+            # Score Text
+            score_text = f"{score:.2f}"
+            cv2.putText(panel, score_text, (bar_start_x + cell_width - 40 - 50, cell_height - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
 
     return np.vstack((frame, panel))
 
@@ -301,6 +346,8 @@ def main():
             
             # Check if hand is in a specific ROI (Picking action?)
             roi_label = logic.check_hand_in_roi(hand_box)
+            logic.update_dwell_times(roi_label) # Update dwell times
+            
             if roi_label:
                 cv2.putText(frame, f"Hand in: {roi_label}", (hx1, hy1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
             
