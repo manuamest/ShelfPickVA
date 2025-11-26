@@ -50,6 +50,24 @@ def get_frame():
     _, buffer = cv2.imencode('.jpg', frame)
     return send_file(io.BytesIO(buffer), mimetype='image/jpeg')
 
+@app.route('/video_info')
+def get_video_info():
+    global CAP
+    if CAP is None:
+        return "Video not loaded", 400
+    
+    total_frames = int(CAP.get(cv2.CAP_PROP_FRAME_COUNT))
+    width = int(CAP.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(CAP.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = CAP.get(cv2.CAP_PROP_FPS)
+    
+    return jsonify({
+        "total_frames": total_frames,
+        "width": width,
+        "height": height,
+        "fps": fps
+    })
+
 @app.route('/config', methods=['GET', 'POST'])
 def handle_config():
     if request.method == 'GET':
