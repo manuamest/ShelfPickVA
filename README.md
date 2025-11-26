@@ -1,6 +1,6 @@
 # Bottle Detection System
 
-![System Overview](docs/system_overview.gif)
+![System Overview](docs/inference_demo.gif)
 *Demonstration of the bottle detection and interaction system in action.*
 
 ## Structure
