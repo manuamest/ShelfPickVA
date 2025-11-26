@@ -1,7 +1,6 @@
 # Bottle Detection System
 
 ![System Overview](docs/inference_demo.gif)
-*Demonstration of the bottle detection and interaction system in action.*
 
 ## Structure
 - `app/`: Main application code (inference and config server).
@@ -13,11 +12,9 @@
 
 ### Configuration Tool
 ![Config Tool](docs/config_tool_demo.gif)
-*Web-based interface for defining Polygon ROIs.*
 
 ### Inference & Interaction
 ![Inference Demo](docs/inference_demo.gif)
-*Real-time detection, tracking, and hand-bottle interaction with similarity analysis.*
 
 ## Setup
 1. Install dependencies:
