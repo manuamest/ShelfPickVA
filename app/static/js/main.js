@@ -118,8 +118,8 @@ function resetView() {
     const fitScale = getFitScale();
 
     // Center
-    const x = (rect.width - canvas.width * fitScale) / 2 + 300;
-    const y = (rect.height - canvas.height * fitScale) / 2 + 250;
+    const x = (rect.width - canvas.width * fitScale) / 2;
+    const y = (rect.height - canvas.height * fitScale) / 2;
 
     setTransform(fitScale, x, y);
 }
@@ -450,31 +450,142 @@ function redo() {
     }
 }
 
+// UI State
+let collapsedGroups = new Set();
+
+function confirmClearAll() {
+    const modal = new bootstrap.Modal(document.getElementById('clearAllModal'));
+    modal.show();
+}
+
+function executeClearAll() {
+    config.rois = [];
+    config.groups = []; // Clear groups too
+    selectedRoiIndex = -1;
+    addToHistory();
+    render();
+    updateRoiList();
+
+    // Hide modal
+    const modalEl = document.getElementById('clearAllModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    modal.hide();
+}
+
+function toggleGroup(groupName) {
+    if (collapsedGroups.has(groupName)) {
+        collapsedGroups.delete(groupName);
+    } else {
+        collapsedGroups.add(groupName);
+    }
+    updateRoiList();
+}
+
+function collapseAllGroups() {
+    const groups = new Set();
+    if (config.groups) config.groups.forEach(g => groups.add(g));
+    config.rois.forEach(roi => groups.add(roi.group || 'Unassigned'));
+    collapsedGroups = groups;
+    updateRoiList();
+}
+
+function createGroup() {
+    const name = prompt("Enter new folder name:");
+    if (name) {
+        if (!config.groups) config.groups = [];
+        if (!config.groups.includes(name)) {
+            config.groups.push(name);
+            addToHistory();
+            updateRoiList();
+        }
+    }
+}
+
+function renameGroup(oldName) {
+    const newName = prompt("Rename folder:", oldName);
+    if (newName && newName !== oldName) {
+        // Update groups list
+        if (config.groups) {
+            const idx = config.groups.indexOf(oldName);
+            if (idx !== -1) config.groups[idx] = newName;
+            else config.groups.push(newName);
+        }
+
+        // Update ROIs
+        config.rois.forEach(roi => {
+            if (roi.group === oldName) roi.group = newName;
+        });
+
+        addToHistory();
+        updateRoiList();
+    }
+}
+
+function deleteGroup(groupName) {
+    if (confirm(`Delete folder "${groupName}" and all its contents?`)) {
+        // Remove from groups list
+        if (config.groups) {
+            config.groups = config.groups.filter(g => g !== groupName);
+        }
+
+        // Remove ROIs
+        config.rois = config.rois.filter(roi => roi.group !== groupName);
+
+        selectedRoiIndex = -1;
+        addToHistory();
+        render();
+        updateRoiList();
+    }
+}
+
 function updateRoiList() {
     roiListEl.innerHTML = '';
 
-    // Group ROIs
-    const groups = {};
-    config.rois.forEach((roi, index) => {
-        const groupName = roi.group || 'Unassigned';
-        if (!groups[groupName]) groups[groupName] = [];
-        groups[groupName].push({ roi, index });
-    });
+    // Collect all unique groups (from config.groups and used in ROIs)
+    const allGroups = new Set(config.groups || []);
+    config.rois.forEach(roi => allGroups.add(roi.group || 'Unassigned'));
+
+    // Sort groups
+    const sortedGroups = Array.from(allGroups).sort();
 
     // Render Groups
-    Object.keys(groups).sort().forEach(groupName => {
-        const groupDiv = document.createElement('div');
-        groupDiv.className = 'roi-group mb-3';
+    sortedGroups.forEach(groupName => {
+        const isCollapsed = collapsedGroups.has(groupName);
+        const roisInGroup = config.rois.map((r, i) => ({ ...r, originalIndex: i }))
+            .filter(r => (r.group || 'Unassigned') === groupName);
 
+        // Group Header
         const groupHeader = document.createElement('div');
-        groupHeader.className = 'text-uppercase text-muted small fw-bold mb-2 ps-1';
-        groupHeader.innerText = groupName;
-        groupDiv.appendChild(groupHeader);
+        groupHeader.className = `roi-group-header ${isCollapsed ? 'collapsed' : ''}`;
 
-        groups[groupName].forEach(item => {
-            const { roi, index } = item;
+        // Header Content
+        groupHeader.innerHTML = `
+            <div class="d-flex align-items-center flex-grow-1" onclick="toggleGroup('${groupName}')">
+                <i class="bi bi-chevron-down"></i>
+                <span>${groupName}</span>
+                <span class="badge bg-secondary ms-2" style="font-size: 0.7rem;">${roisInGroup.length}</span>
+            </div>
+            <div class="tree-actions ms-2">
+                <button class="tree-action-btn" title="Rename Folder" onclick="renameGroup('${groupName}')">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="tree-action-btn danger" title="Delete Folder" onclick="deleteGroup('${groupName}')">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+        `;
+        roiListEl.appendChild(groupHeader);
+
+        // Group Content
+        const groupContent = document.createElement('div');
+        groupContent.className = `roi-group-content ${isCollapsed ? 'hidden' : ''}`;
+
+        roisInGroup.forEach(item => {
+            const index = item.originalIndex;
+            const roi = config.rois[index];
+
             const div = document.createElement('div');
-            div.className = 'roi-item' + (index === selectedRoiIndex ? ' selected' : '');
+            div.className = 'roi-tree-item' + (index === selectedRoiIndex ? ' selected' : '');
             div.onclick = () => {
                 selectedRoiIndex = index;
                 render();
@@ -482,37 +593,95 @@ function updateRoiList() {
             };
 
             div.innerHTML = `
-                <div class="d-flex align-items-center mb-2">
-                    <div class="roi-color" style="background-color:${roi.color}"></div>
-                    <input class="roi-input fw-bold" type="text" value="${roi.label}" 
+                <div class="item-icon">
+                    <input type="color" class="color-picker-input" value="${roi.color}" 
+                        onchange="updateColor(${index}, this.value)"
+                        onclick="event.stopPropagation()">
+                </div>
+                <div class="flex-grow-1">
+                    <input class="tree-input fw-bold" type="text" value="${roi.label}" 
                         onchange="updateLabel(${index}, this.value)" 
                         onclick="event.stopPropagation()" placeholder="Label">
-                    <button class="btn btn-sm btn-link text-danger p-0 ms-2" 
-                        onclick="deleteRoi(${index}); event.stopPropagation()"><i class="bi bi-x-lg"></i></button>
+                    
+                    <div class="price-input-container" onclick="event.stopPropagation()">
+                        <i class="bi bi-tag-fill price-input-icon"></i>
+                        <input class="price-input" type="number" value="${roi.price || 0}" 
+                            onchange="updatePrice(${index}, this.value)" 
+                            placeholder="0.00">
+                    </div>
                 </div>
-                <div class="row g-2">
-                    <div class="col-6">
-                        <input class="form-control form-control-sm bg-dark text-light border-secondary" 
-                            type="text" value="${roi.group || ''}" 
-                            onchange="updateGroup(${index}, this.value)" 
-                            onclick="event.stopPropagation()" placeholder="Group">
-                    </div>
-                    <div class="col-6">
-                        <div class="input-group input-group-sm">
-                            <span class="input-group-text bg-dark text-secondary border-secondary">$</span>
-                            <input class="form-control bg-dark text-light border-secondary" 
-                                type="number" value="${roi.price || 0}" 
-                                onchange="updatePrice(${index}, this.value)" 
-                                onclick="event.stopPropagation()" placeholder="Price">
-                        </div>
-                    </div>
+                <div class="tree-actions">
+                     <!-- Move to Group -->
+                    <button class="tree-action-btn" title="Change Group" onclick="openChangeGroupModal(${index}); event.stopPropagation()">
+                        <i class="bi bi-folder-symlink"></i>
+                    </button>
+                    <button class="tree-action-btn danger" title="Delete" onclick="deleteRoi(${index}); event.stopPropagation()">
+                        <i class="bi bi-trash"></i>
+                    </button>
                 </div>
             `;
-            groupDiv.appendChild(div);
+            groupContent.appendChild(div);
         });
 
-        roiListEl.appendChild(groupDiv);
+        roiListEl.appendChild(groupContent);
     });
+}
+
+let roiIndexToChangeGroup = -1;
+
+function openChangeGroupModal(index) {
+    roiIndexToChangeGroup = index;
+    const currentGroup = config.rois[index].group || 'Unassigned';
+
+    // Populate Existing Groups
+    const groups = new Set();
+    config.rois.forEach(r => {
+        if (r.group) groups.add(r.group);
+    });
+
+    const select = document.getElementById('existingGroupSelect');
+    select.innerHTML = '<option value="">-- Select Group --</option>';
+
+    groups.forEach(g => {
+        const option = document.createElement('option');
+        option.value = g;
+        option.innerText = g;
+        if (g === currentGroup) option.selected = true;
+        select.appendChild(option);
+    });
+
+    // Reset New Input
+    document.getElementById('newGroupInput').value = '';
+
+    const modal = new bootstrap.Modal(document.getElementById('changeGroupModal'));
+    modal.show();
+}
+
+function saveChangeGroup() {
+    if (roiIndexToChangeGroup === -1) return;
+
+    const existingGroup = document.getElementById('existingGroupSelect').value;
+    const newGroup = document.getElementById('newGroupInput').value.trim();
+
+    let finalGroup = existingGroup;
+    if (newGroup) {
+        finalGroup = newGroup;
+    }
+
+    if (finalGroup) {
+        updateGroup(roiIndexToChangeGroup, finalGroup);
+    }
+
+    const modalEl = document.getElementById('changeGroupModal');
+    const modal = bootstrap.Modal.getInstance(modalEl);
+    modal.hide();
+    roiIndexToChangeGroup = -1;
+}
+
+function updateColor(index, newColor) {
+    config.rois[index].color = newColor;
+    addToHistory();
+    render();
 }
 
 function updateLabel(index, newLabel) {
@@ -523,7 +692,7 @@ function updateLabel(index, newLabel) {
 function updateGroup(index, newGroup) {
     config.rois[index].group = newGroup;
     addToHistory();
-    updateRoiList(); // Re-render to move to new group
+    updateRoiList();
 }
 
 function updatePrice(index, newPrice) {
@@ -532,6 +701,9 @@ function updatePrice(index, newPrice) {
 }
 
 function deleteRoi(index) {
+    // We can use a modal here too if we want, but user asked specifically for "Clear All" to have a popup.
+    // Let's keep confirm for single delete for speed, or maybe no confirm? 
+    // VS Code deletes files with confirm usually.
     if (confirm("Delete this ROI?")) {
         config.rois.splice(index, 1);
         selectedRoiIndex = -1;
@@ -542,13 +714,8 @@ function deleteRoi(index) {
 }
 
 function clearAll() {
-    if (confirm("Are you sure you want to clear all ROIs?")) {
-        config.rois = [];
-        selectedRoiIndex = -1;
-        addToHistory();
-        render();
-        updateRoiList();
-    }
+    // Deprecated in favor of confirmClearAll
+    confirmClearAll();
 }
 
 function saveConfig() {

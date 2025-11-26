@@ -8,8 +8,8 @@ body {
 
 /* Scrollbar styling */
 ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 0.5rem;
+    height: 0.5rem;
 }
 
 ::-webkit-scrollbar-track {
@@ -18,7 +18,7 @@ body {
 
 ::-webkit-scrollbar-thumb {
     background: #444;
-    border-radius: 4px;
+    border-radius: 0.25rem;
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -28,29 +28,30 @@ body {
 /* Sidebar */
 #sidebar {
     background-color: #1e1e1e;
-    border-right: 1px solid #333;
+    border-right: 0.0625rem solid #333;
     height: 100vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.3);
+    box-shadow: 0.125rem 0 0.625rem rgba(0, 0, 0, 0.3);
     z-index: 10;
+    position: relative;
 }
 
 .sidebar-header {
-    padding: 20px;
-    border-bottom: 1px solid #333;
+    padding: 1.25rem;
+    border-bottom: 0.0625rem solid #333;
     background-color: #252526;
 }
 
 .sidebar-content {
     flex-grow: 1;
     overflow-y: auto;
-    padding: 15px;
+    padding: 0.9375rem;
 }
 
 .sidebar-footer {
-    padding: 15px;
-    border-top: 1px solid #333;
+    padding: 0.9375rem;
+    border-top: 0.0625rem solid #333;
     background-color: #252526;
     font-size: 0.85rem;
     color: #888;
@@ -59,10 +60,10 @@ body {
 /* ROI Items */
 .roi-item {
     background-color: #2d2d2d;
-    border-radius: 6px;
-    padding: 10px;
-    margin-bottom: 8px;
-    border-left: 4px solid transparent;
+    border-radius: 0.375rem;
+    padding: 0.625rem;
+    margin-bottom: 0.5rem;
+    border-left: 0.25rem solid transparent;
     transition: all 0.2s ease;
     cursor: pointer;
 }
@@ -75,15 +76,15 @@ body {
     background-color: #383838;
     border-left-color: #0d6efd;
     /* Bootstrap primary */
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 0.125rem 0.3125rem rgba(0, 0, 0, 0.2);
 }
 
 .roi-color {
-    width: 12px;
-    height: 12px;
+    width: 0.75rem;
+    height: 0.75rem;
     border-radius: 50%;
     display: inline-block;
-    margin-right: 8px;
+    margin-right: 0.5rem;
 }
 
 .roi-input {
@@ -96,7 +97,7 @@ body {
 
 .roi-input:focus {
     outline: none;
-    border-bottom: 1px solid #0d6efd;
+    border-bottom: 0.0625rem solid #0d6efd;
 }
 
 /* Main Content Area */
@@ -117,8 +118,8 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
-    background-image: radial-gradient(#333 1px, transparent 1px);
-    background-size: 20px 20px;
+    background-image: radial-gradient(#555 0.15rem, transparent 0.15rem);
+    background-size: 1.5rem 1.5rem;
     cursor: grab;
 }
 
@@ -127,7 +128,7 @@ body {
 }
 
 canvas {
-    box-shadow: 0 0 30px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 1.875rem rgba(0, 0, 0, 0.5);
     transition: transform 0.1s ease-out;
     /* Smooth zoom */
     transform-origin: 0 0;
@@ -137,29 +138,29 @@ canvas {
 /* Floating Toolbar */
 .floating-toolbar {
     position: absolute;
-    top: 20px;
+    top: 1.25rem;
     left: 50%;
     transform: translateX(-50%);
     background-color: rgba(30, 30, 30, 0.9);
-    backdrop-filter: blur(5px);
-    padding: 8px 15px;
-    border-radius: 50px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(0.3125rem);
+    padding: 0.5rem 0.9375rem;
+    border-radius: 3.125rem;
+    box-shadow: 0 0.25rem 0.9375rem rgba(0, 0, 0, 0.4);
     display: flex;
-    gap: 10px;
+    gap: 0.625rem;
     z-index: 100;
-    border: 1px solid #444;
+    border: 0.0625rem solid #444;
 }
 
 .tool-btn {
     background: transparent;
     border: none;
     color: #aaa;
-    padding: 8px;
+    padding: 0.5rem;
     border-radius: 50%;
     transition: all 0.2s;
-    width: 40px;
-    height: 40px;
+    width: 2.5rem;
+    height: 2.5rem;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -178,42 +179,43 @@ canvas {
 /* Timeline Area */
 #timeline-area {
     background-color: #1e1e1e;
-    border-top: 1px solid #333;
-    padding: 10px 20px;
+    border-top: 0.0625rem solid #333;
+    padding: 0.625rem 1.25rem;
     z-index: 20;
 }
 
 .timeline-controls {
     display: flex;
     align-items: center;
-    gap: 15px;
-    margin-bottom: 5px;
+    gap: 0.9375rem;
+    margin-bottom: 0.3125rem;
 }
 
 /* Custom Range Slider */
 input[type=range] {
     -webkit-appearance: none;
+    appearance: none;
     width: 100%;
     background: transparent;
 }
 
 input[type=range]::-webkit-slider-thumb {
     -webkit-appearance: none;
-    height: 16px;
-    width: 16px;
+    height: 1rem;
+    width: 1rem;
     border-radius: 50%;
     background: #0d6efd;
     cursor: pointer;
-    margin-top: -6px;
-    box-shadow: 0 0 5px rgba(13, 110, 253, 0.5);
+    margin-top: -0.375rem;
+    box-shadow: 0 0 0.3125rem rgba(13, 110, 253, 0.5);
 }
 
 input[type=range]::-webkit-slider-runnable-track {
     width: 100%;
-    height: 4px;
+    height: 0.25rem;
     cursor: pointer;
     background: #444;
-    border-radius: 2px;
+    border-radius: 0.125rem;
 }
 
 input[type=range]:focus::-webkit-slider-runnable-track {
@@ -234,4 +236,232 @@ input[type=range]:focus::-webkit-slider-runnable-track {
 .btn-danger {
     background-color: #dc3545;
     border-color: #dc3545;
+}
+
+/* Sidebar Transition */
+#sidebar {
+    transition: width 0.3s ease, transform 0.3s ease;
+    overflow: visible;
+    /* Allow toggle to stick out */
+    position: relative;
+}
+
+#sidebar.collapsed {
+    width: 0 !important;
+    padding: 0;
+    border: none;
+}
+
+#sidebar.collapsed .sidebar-header,
+#sidebar.collapsed .sidebar-content,
+#sidebar.collapsed .sidebar-footer {
+    display: none;
+}
+
+/* Toggle Button - Attached to Sidebar */
+#sidebar-toggle {
+    position: absolute;
+    right: -2.5rem;
+    position: relative;
+    z-index: 10;
+}
+
+/* VS Code Style Tree - Enlarged */
+.roi-tree {
+    font-size: 1.1rem;
+    /* Increased base font size */
+}
+
+.roi-group-header {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    /* Increased padding */
+    cursor: pointer;
+    color: #ccc;
+    font-weight: 600;
+    user-select: none;
+    border-bottom: 0.0625rem solid #2a2d2e;
+}
+
+.roi-group-header:hover {
+    background-color: #2a2d2e;
+}
+
+.roi-group-header i {
+    margin-right: 0.625rem;
+    font-size: 1rem;
+    /* Larger icon */
+    transition: transform 0.2s;
+}
+
+.roi-group-header.collapsed i {
+    transform: rotate(-90deg);
+}
+
+.roi-group-content {
+    margin-left: 0;
+    display: block;
+}
+
+.roi-group-content.hidden {
+    display: none;
+}
+
+.roi-tree-item {
+    display: flex;
+    align-items: center;
+    padding: 0.5rem 1.5rem 0.5rem 1.5rem;
+    /* Increased padding */
+    cursor: pointer;
+    border-left: 0.25rem solid transparent;
+    /* Thicker border */
+    color: #aaa;
+    border-bottom: 0.0625rem solid #252526;
+    height: 6.25rem;
+    /* Fixed height for consistency */
+}
+
+.roi-tree-item:hover {
+    background-color: #2a2d2e;
+    color: #eee;
+}
+
+.roi-tree-item.selected {
+    background-color: #37373d;
+    color: #fff;
+    border-left-color: #0d6efd;
+}
+
+.roi-tree-item .item-icon {
+    margin-right: 0.75rem;
+    display: flex;
+    align-items: center;
+}
+
+/* Color Picker Input - Enlarged */
+input[type="color"].color-picker-input {
+    -webkit-appearance: none;
+    appearance: none;
+    border: none;
+    width: 1.5rem;
+    /* Larger */
+    height: 1.5rem;
+    /* Larger */
+    padding: 0;
+    overflow: hidden;
+    background: none;
+    cursor: pointer;
+    border-radius: 0.25rem;
+}
+
+input[type="color"].color-picker-input::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+input[type="color"].color-picker-input::-webkit-color-swatch {
+    border: 0.0625rem solid #555;
+    border-radius: 0.25rem;
+}
+
+/* Editable Label in Tree - Enlarged */
+.tree-input {
+    background: transparent;
+    border: 0.0625rem solid transparent;
+    color: inherit;
+    font-size: 1.1rem;
+    /* Larger font */
+    width: 100%;
+    padding: 0.25rem 0.375rem;
+    border-radius: 0.25rem;
+}
+
+.tree-input:focus {
+    background-color: #3c3c3c;
+    border-color: #0d6efd;
+    outline: none;
+    color: #fff;
+}
+
+.tree-actions {
+    margin-left: auto;
+    display: none;
+    gap: 0.5rem;
+    /* More gap */
+}
+
+.roi-tree-item:hover .tree-actions {
+    display: flex;
+}
+
+.tree-action-btn {
+    background: none;
+    border: none;
+    color: #aaa;
+    cursor: pointer;
+    padding: 0;
+    width: 2rem;
+    /* Fixed width */
+    height: 2rem;
+    /* Fixed height */
+    font-size: 1.2rem;
+    border-radius: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    /* Prevent shrinking */
+}
+
+.tree-action-btn:hover {
+    color: #fff;
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.tree-action-btn.danger:hover {
+    color: #ff6b6b;
+    background-color: rgba(220, 53, 69, 0.2);
+}
+
+/* Price Input Styling */
+.price-input-container {
+    display: flex;
+    align-items: center;
+    background-color: #1e1e1e;
+    border: 0.0625rem solid #333;
+    border-radius: 0.25rem;
+    padding: 0.125rem 0.375rem;
+    margin-top: 0.25rem;
+    width: fit-content;
+}
+
+.price-input-container:focus-within {
+    border-color: #0d6efd;
+}
+
+.price-input-icon {
+    color: #888;
+    font-size: 0.9rem;
+    margin-right: 0.25rem;
+}
+
+.price-input {
+    background: transparent;
+    border: none;
+    color: #eee;
+    font-size: 0.95rem;
+    width: 3.75rem;
+    text-align: right;
+    font-family: monospace;
+}
+
+.price-input:focus {
+    outline: none;
+}
+
+/* Remove spin buttons from number input */
+.price-input::-webkit-inner-spin-button,
+.price-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
 }
