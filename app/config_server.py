@@ -5,6 +5,8 @@ import sys
 import numpy as np
 from flask import Flask, render_template, request, jsonify, send_file
 import io
+import re
+import shutil
 
 app = Flask(__name__)
 
@@ -79,6 +81,38 @@ def handle_config():
         return jsonify(load_config())
     else:
         config = request.json
+
+        # Regenerate ROI images
+        global CAP
+        if CAP is not None:
+            # Ensure folder exists and is clean
+            if os.path.exists("roi_images"):
+                shutil.rmtree("roi_images")
+            os.makedirs("roi_images")
+
+            # Capture frame 0
+            CAP.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = CAP.read()
+            
+            if ret:
+                for roi in config.get("rois", []):
+                     if "points" in roi:
+                        pts = np.array(roi['points'], dtype=np.int32)
+                        x, y, w, h = cv2.boundingRect(pts)
+                        # Ensure crop is within frame
+                        x, y = max(0, x), max(0, y)
+                        w = min(w, frame.shape[1] - x)
+                        h = min(h, frame.shape[0] - y)
+                        
+                        if w > 0 and h > 0:
+                            roi_crop = frame[y:y+h, x:x+w].copy()
+                            safe_label = re.sub(r'[^a-zA-Z0-9]', '_', roi.get('label', 'unknown'))
+                            image_filename = f"roi_bottle_{safe_label}.jpg"
+                            image_path = os.path.join("roi_images", image_filename)
+                            cv2.imwrite(image_path, roi_crop)
+                            roi["image_path"] = image_path
+                            print(f"Generated image for ROI: {roi.get('label')}")
+
         save_config(config)
         return jsonify({"status": "saved"})
 
