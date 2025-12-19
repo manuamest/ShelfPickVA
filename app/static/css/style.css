@@ -424,6 +424,36 @@ input[type="color"].color-picker-input::-webkit-color-swatch {
 }
 
 /* Price Input Styling */
+/* Price Input Styling */
+.price-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.25rem;
+}
+
+.price-btn {
+    background-color: #333;
+    border: 0.0625rem solid #444;
+    color: #ccc;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 0.25rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    padding: 0;
+    font-size: 1rem;
+    transition: all 0.2s;
+}
+
+.price-btn:hover {
+    background-color: #444;
+    color: #fff;
+    border-color: #555;
+}
+
 .price-input-container {
     display: flex;
     align-items: center;
@@ -431,7 +461,7 @@ input[type="color"].color-picker-input::-webkit-color-swatch {
     border: 0.0625rem solid #333;
     border-radius: 0.25rem;
     padding: 0.125rem 0.375rem;
-    margin-top: 0.25rem;
+    /* margin-top: 0.25rem; removed as wrapper handles it */
     width: fit-content;
 }
 
@@ -460,8 +490,16 @@ input[type="color"].color-picker-input::-webkit-color-swatch {
 }
 
 /* Remove spin buttons from number input */
+/* Remove spin buttons from number input */
 .price-input::-webkit-inner-spin-button,
 .price-input::-webkit-outer-spin-button {
     -webkit-appearance: none;
     margin: 0;
+    display: none;
+    /* Force hide */
+}
+
+/* Firefox */
+.price-input {
+    -moz-appearance: textfield;
 }
