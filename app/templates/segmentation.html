@@ -1,0 +1,100 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Segmentation Tool</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/static/css/style.css">
+    <style>
+        .snap-indicator {
+            fill: none;
+            stroke: #00ff00;
+            stroke-width: 2px;
+            stroke-dasharray: 4;
+        }
+    </style>
+</head>
+<body>
+    <div class="d-flex w-100 h-100 position-relative">
+        <!-- Sidebar -->
+        <div id="sidebar" style="width: 20rem; flex-shrink: 0;">
+            <div class="sidebar-header d-flex justify-content-between align-items-center">
+                <h5 class="m-0 text-white"><i class="bi bi-bezier2 me-2"></i>Segmentation</h5>
+                <span id="saveStatus" class="badge bg-secondary">Saved</span>
+            </div>
+
+            <div class="p-3 border-bottom border-secondary">
+                <div class="d-grid gap-2">
+                    <button class="btn btn-success btn-sm" onclick="saveCurrentFrame()">
+                        <i class="bi bi-save me-1"></i> Save Frame (Enter)
+                    </button>
+                    <button class="btn btn-primary btn-sm" onclick="nextFrame()">
+                         Next Frame &gt;
+                    </button>
+                     <div class="btn-group btn-group-sm">
+                        <button class="btn btn-secondary" onclick="undoPoint()"><i class="bi bi-arrow-counterclockwise"></i> Undo Point</button>
+                        <button class="btn btn-outline-danger" onclick="clearFrame()">Clear Frame</button>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <label class="text-white small">Current Class ID:</label>
+                    <input type="number" id="classIdInput" class="form-control form-control-sm bg-dark text-white" value="0" min="0">
+                </div>
+            </div>
+
+            <div class="sidebar-content p-0">
+                <div class="p-2 bg-dark border-bottom border-secondary text-muted small">
+                    POLYGONS IN FRAME
+                </div>
+                <div id="roiList" class="roi-tree">
+                    <!-- List injected here -->
+                </div>
+            </div>
+            
+            <div class="sidebar-footer">
+                <div id="statusText">Ready</div>
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <div id="main-content" class="flex-grow-1 bg-dark">
+            <!-- Toolbar -->
+            <div class="floating-toolbar">
+                <button class="tool-btn active" id="btn-polygon" onclick="setTool('polygon')" title="Draw Polygon">
+                    <i class="bi bi-pentagon"></i>
+                </button>
+                <button class="tool-btn" id="btn-pointer" onclick="setTool('pointer')" title="Select/Edit">
+                    <i class="bi bi-cursor-fill"></i>
+                </button>
+                <div class="vr bg-secondary mx-1"></div>
+                <button class="tool-btn" onclick="zoom(1)"><i class="bi bi-zoom-in"></i></button>
+                <button class="tool-btn" onclick="zoom(-1)"><i class="bi bi-zoom-out"></i></button>
+                <button class="tool-btn" onclick="resetView()"><i class="bi bi-arrows-fullscreen"></i></button>
+            </div>
+
+            <!-- Canvas -->
+            <div id="canvas-container">
+                <canvas id="canvas"></canvas>
+            </div>
+
+            <!-- Navigation -->
+            <div id="timeline-area">
+                <div class="timeline-controls">
+                    <button class="btn btn-sm btn-outline-light rounded-circle" onclick="prevFrame()"><i class="bi bi-chevron-left"></i></button>
+                    <button class="btn btn-sm btn-outline-light rounded-circle" onclick="nextFrame()"><i class="bi bi-chevron-right"></i></button>
+                    <span class="ms-2 font-monospace small">
+                        <span id="currentFrame">0</span> / <span id="totalFrames">0</span>
+                    </span>
+                    <span class="ms-2 text-muted small" id="filenameLabel"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="/static/js/segmentation.js"></script>
+</body>
+</html>

@@ -13,7 +13,7 @@ except ImportError:
     from app.logic import InteractionLogic
 
 # Constants
-CONFIG_FILE = 'bottle_config.json'
+CONFIG_FILE = 'cfgs/bottle_config.json'
 YOLO_MODEL_PATH = 'models/model.pt' # Placeholder, user should replace with SKU-110k model
 YOLO_POSE_PATH = 'models/yolov8n-pose.pt'
 
@@ -104,7 +104,12 @@ def main():
         
     video_path = sys.argv[1]
     
-    # Load Config
+    collect_data = False
+    if "--collect-data" in sys.argv:
+        collect_data = True
+        print("Data Collection Mode: Enabled. Saving hand crops to data/hand_crops_raw/")
+        os.makedirs("data/hand_crops_raw", exist_ok=True)
+
     try:
         with open(CONFIG_FILE, 'r') as f:
             config = json.load(f)
@@ -138,6 +143,8 @@ def main():
         ret, frame = cap.read()
         if not ret:
             break
+            
+        clean_frame = frame.copy()
             
         # 1. Detect Hands
         hands = hand_detector.detect(frame)
@@ -191,17 +198,32 @@ def main():
             h_w = hx2 - hx1
             h_h = hy2 - hy1
             
-            # 6x Margin crop (Doubled from 3x)
-            crop_size = int(max(h_w, h_h) * 6) 
+            # Custom directional margins
+            # Legacy was 6x total size centered -> ~2.5x margin on each side
+            # New req: North=Equal(2.5x), South=Remove(0), East/West=Half(1.25x)
             
-            x_min = max(0, h_cx - crop_size//2)
-            y_min = max(0, h_cy - crop_size//2)
-            x_max = min(frame.shape[1], h_cx + crop_size//2)
-            y_max = min(frame.shape[0], h_cy + crop_size//2)
+            ref_size = max(h_w, h_h)
+            
+            margin_north = int(ref_size * 2.5)
+            margin_south = 0
+            margin_side = int(ref_size * 1.25)
+            
+            x_min = max(0, hx1 - margin_side)
+            y_min = max(0, hy1 - margin_north)
+            x_max = min(frame.shape[1], hx2 + margin_side)
+            y_max = min(frame.shape[0], hy2 + margin_south)
             
             if x_max > x_min and y_max > y_min:
-                hand_crop = frame[y_min:y_max, x_min:x_max]
+                hand_crop = clean_frame[y_min:y_max, x_min:x_max]
                 
+                # Data Collection
+                if collect_data:
+                    # Save crop
+                    import time
+                    timestamp = int(time.time() * 1000)
+                    filename = f"data/hand_crops_raw/crop_{timestamp}_{track_id}.jpg"
+                    cv2.imwrite(filename, hand_crop)
+
                 # Run Segmentation
                 masked_bottle, mask = bottle_segmenter.segment_bottle(hand_crop)
                 

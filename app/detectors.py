@@ -32,7 +32,7 @@ CONF_THRESHOLD = 0.4
 #         return detections
 
 class BottleSegmenter:
-    def __init__(self, model_path='yolov8n-seg.pt'):
+    def __init__(self, model_path='/home/manuamest/Repos/ShelfPickVA/runs/segment/bottle_seg_v15/weights/best.pt'):
         print(f"Loading YOLO Segmentation model from {model_path}...")
         self.model = YOLO(model_path)
         
@@ -40,9 +40,8 @@ class BottleSegmenter:
         if crop_image.size == 0:
             return None, None
             
-        # Detect only bottles (or fallback to any object if specific class needed)
-        # COCO class 39 is 'bottle'. 
-        results = self.model(crop_image, verbose=False, classes=[39])
+        # Detect bottles (Custom model has only class 0: 'Bottle in hand')
+        results = self.model(crop_image, verbose=False, classes=[0])
         
         largest_mask = None
         masked_img = None
