@@ -5,6 +5,8 @@ import sys
 import numpy as np
 from flask import Flask, render_template, request, jsonify, send_file
 import io
+import re
+import shutil
 
 app = Flask(__name__)
 
@@ -14,8 +16,13 @@ CAP = None
 
 def load_config():
     if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, 'r') as f:
-            return json.load(f)
+        try:
+            with open(CONFIG_FILE, 'r') as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            print(f"Error: {CONFIG_FILE} is corrupted. Backing up and creating a new one.")
+            os.rename(CONFIG_FILE, CONFIG_FILE + ".bak")
+            return {"rois": []}
     return {"rois": []}
 
 def save_config(config):
@@ -28,27 +35,45 @@ def index():
 
 @app.route('/frame')
 def get_frame():
+    global VIDEO_PATH
+    if VIDEO_PATH is None:
+        return "Video not loaded", 400
+    
+    frame_idx = request.args.get('index', default=0, type=int)
+    
+    video_name = os.path.splitext(os.path.basename(VIDEO_PATH))[0]
+    # Use absolute path matching main()
+    cache_dir = os.path.join(os.getcwd(), "frames_cache", video_name)
+    frame_path = os.path.join(cache_dir, f"frame_{frame_idx}.jpg")
+    
+    if os.path.exists(frame_path):
+        return send_file(frame_path, mimetype='image/jpeg')
+    else:
+        # Fallback if frame missing (or end of video loop logic handled by frontend requesting 0)
+        # If index is out of bounds, maybe return 404 or loop?
+        # Let's try to return frame 0 if out of bounds to loop
+        frame_0 = os.path.join(cache_dir, "frame_0.jpg")
+        if os.path.exists(frame_0):
+             return send_file(frame_0, mimetype='image/jpeg')
+        return "Frame not found", 404
+
+@app.route('/video_info')
+def get_video_info():
     global CAP
     if CAP is None:
         return "Video not loaded", 400
     
-    # Get specific frame index if requested, else current
-    frame_idx = request.args.get('index', type=int)
-    if frame_idx is not None:
-        CAP.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+    total_frames = int(CAP.get(cv2.CAP_PROP_FRAME_COUNT))
+    width = int(CAP.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(CAP.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = CAP.get(cv2.CAP_PROP_FPS)
     
-    ret, frame = CAP.read()
-    if not ret:
-        # Loop back to start if end reached
-        CAP.set(cv2.CAP_PROP_POS_FRAMES, 0)
-        ret, frame = CAP.read()
-    
-    if not ret:
-        return "Could not read frame", 500
-
-    # Encode to JPEG
-    _, buffer = cv2.imencode('.jpg', frame)
-    return send_file(io.BytesIO(buffer), mimetype='image/jpeg')
+    return jsonify({
+        "total_frames": total_frames,
+        "width": width,
+        "height": height,
+        "fps": fps
+    })
 
 @app.route('/config', methods=['GET', 'POST'])
 def handle_config():
@@ -56,6 +81,38 @@ def handle_config():
         return jsonify(load_config())
     else:
         config = request.json
+
+        # Regenerate ROI images
+        global CAP
+        if CAP is not None:
+            # Ensure folder exists and is clean
+            if os.path.exists("roi_images"):
+                shutil.rmtree("roi_images")
+            os.makedirs("roi_images")
+
+            # Capture frame 0
+            CAP.set(cv2.CAP_PROP_POS_FRAMES, 0)
+            ret, frame = CAP.read()
+            
+            if ret:
+                for roi in config.get("rois", []):
+                     if "points" in roi:
+                        pts = np.array(roi['points'], dtype=np.int32)
+                        x, y, w, h = cv2.boundingRect(pts)
+                        # Ensure crop is within frame
+                        x, y = max(0, x), max(0, y)
+                        w = min(w, frame.shape[1] - x)
+                        h = min(h, frame.shape[0] - y)
+                        
+                        if w > 0 and h > 0:
+                            roi_crop = frame[y:y+h, x:x+w].copy()
+                            safe_label = re.sub(r'[^a-zA-Z0-9]', '_', roi.get('label', 'unknown'))
+                            image_filename = f"roi_bottle_{safe_label}.jpg"
+                            image_path = os.path.join("roi_images", image_filename)
+                            cv2.imwrite(image_path, roi_crop)
+                            roi["image_path"] = image_path
+                            print(f"Generated image for ROI: {roi.get('label')}")
+
         save_config(config)
         return jsonify({"status": "saved"})
 
@@ -127,6 +184,35 @@ def main():
         
     print(f"Starting server for video: {VIDEO_PATH}")
     
+    # Frame Caching Logic
+    video_name = os.path.splitext(os.path.basename(VIDEO_PATH))[0]
+    # Use absolute path for cache to avoid CWD issues with Flask
+    cache_dir = os.path.join(os.getcwd(), "frames_cache", video_name)
+    
+    if not os.path.exists(cache_dir):
+        print(f"Extracting frames to cache: {cache_dir} ... This might take a while.")
+        os.makedirs(cache_dir, exist_ok=True)
+        
+        cap = cv2.VideoCapture(VIDEO_PATH)
+        frame_count = 0
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        
+        while True:
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            # Save as jpg
+            cv2.imwrite(os.path.join(cache_dir, f"frame_{frame_count}.jpg"), frame, [cv2.IMWRITE_JPEG_QUALITY, 70])
+            frame_count += 1
+            if frame_count % 100 == 0:
+                print(f"Extracted {frame_count}/{total} frames...")
+        
+        cap.release()
+        print("Frame extraction complete.")
+    else:
+        print(f"Using existing frame cache: {cache_dir}")
+
     # Retroactive ROI Image Generation
     config = load_config()
     rois_updated = False
