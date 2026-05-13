@@ -603,11 +603,19 @@ function updateRoiList() {
                         onchange="updateLabel(${index}, this.value)" 
                         onclick="event.stopPropagation()" placeholder="Label">
                     
-                    <div class="price-input-container" onclick="event.stopPropagation()">
-                        <i class="bi bi-tag-fill price-input-icon"></i>
-                        <input class="price-input" type="number" value="${roi.price || 0}" 
-                            onchange="updatePrice(${index}, this.value)" 
-                            placeholder="0.00">
+                    <div class="price-wrapper">
+                        <button class="price-btn" onclick="adjustPrice(${index}, -1); event.stopPropagation()">
+                            <i class="bi bi-dash"></i>
+                        </button>
+                        <div class="price-input-container" onclick="event.stopPropagation()">
+                            <i class="bi bi-tag-fill price-input-icon"></i>
+                            <input class="price-input" type="number" value="${roi.price || 0}" 
+                                onchange="updatePrice(${index}, this.value)" 
+                                placeholder="0.00">
+                        </div>
+                        <button class="price-btn" onclick="adjustPrice(${index}, 1); event.stopPropagation()">
+                            <i class="bi bi-plus"></i>
+                        </button>
                     </div>
                 </div>
                 <div class="tree-actions">
@@ -696,8 +704,17 @@ function updateGroup(index, newGroup) {
 }
 
 function updatePrice(index, newPrice) {
-    config.rois[index].price = newPrice;
+    config.rois[index].price = parseFloat(newPrice);
     addToHistory();
+}
+
+function adjustPrice(index, amount) {
+    let currentPrice = parseFloat(config.rois[index].price || 0);
+    const newPrice = currentPrice + amount;
+    // Don't go below 0 if that's desired, but for now allow it or just max(0)
+    config.rois[index].price = Math.max(0, newPrice);
+    addToHistory();
+    updateRoiList();
 }
 
 function deleteRoi(index) {
